@@ -1,0 +1,832 @@
+openapi: 3.0.3
+info:
+  title: Innerva API
+  version: 0.1.0
+  description: >-
+    The live Innerva HTTP contract. Paths are added only when their handlers,
+    authentication requirements, validation, and tests are implemented.
+servers:
+  - url: https://innerva.net
+    description: Production.
+  - url: https://stg.innerva.net
+    description: Staging sandbox. Real-model inference requires an operator-issued staging spend authorization; other grants receive a labeled dummy response.
+paths:
+  /.well-known/innerva:
+    get:
+      operationId: getDiscovery
+      summary: Discover the protocol endpoints and supported profile
+      responses:
+        '200':
+          description: Protocol discovery metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Discovery'
+  /v1/access-requests:
+    post:
+      operationId: createAccessRequest
+      summary: Create an access request and receive a customer interaction link
+      parameters:
+        - $ref: '#/components/parameters/ContentDigest'
+        - $ref: '#/components/parameters/InnervaNonce'
+        - $ref: '#/components/parameters/SignatureInput'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequest'
+      responses:
+        '200':
+          description: Access request created or an idempotent result replayed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestCreated'
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/access-requests/{id}/continue:
+    post:
+      operationId: continueAccessRequest
+      summary: Exchange a completed interaction for an inference capability
+      parameters:
+        - $ref: '#/components/parameters/AccessRequestID'
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/ContentDigest'
+        - $ref: '#/components/parameters/InnervaNonce'
+        - $ref: '#/components/parameters/SignatureInput'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContinuationRequest'
+      responses:
+        '200':
+          description: A new inference capability and its management credential, or the exact prior response for an idempotent retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/capabilities/{id}/rotate:
+    post:
+      operationId: rotateCapability
+      summary: Rotate an inference capability
+      parameters:
+        - $ref: '#/components/parameters/CapabilityID'
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/ContentDigest'
+        - $ref: '#/components/parameters/InnervaNonce'
+        - $ref: '#/components/parameters/SignatureInput'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyRequest'
+      responses:
+        '200':
+          description: A rotated inference capability, or the exact prior successor for an idempotent retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/capabilities/{id}:
+    delete:
+      operationId: revokeCapability
+      summary: Revoke a capability and its grant
+      parameters:
+        - $ref: '#/components/parameters/CapabilityID'
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/InnervaNonce'
+        - $ref: '#/components/parameters/SignatureInput'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '204':
+          description: Capability and grant revoked.
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/responses:
+    post:
+      operationId: createInferenceResponse
+      summary: Stream a metered inference response
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/ContentDigest'
+        - $ref: '#/components/parameters/InnervaNonce'
+        - $ref: '#/components/parameters/SignatureInput'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceRequest'
+      responses:
+        '200':
+          description: >-
+            A normalized text response streamed as server-sent events. The stream
+            starts with one response.created event, may contain
+            response.output_text.delta events, and ends with exactly one
+            response.completed, response.incomplete, or error event. Each SSE
+            event has one event field naming the event and one data field whose
+            JSON object matches InferenceCreatedEvent, InferenceDeltaEvent,
+            InferenceTerminalEvent, or InferenceErrorEvent.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              x-sse-events:
+                - InferenceCreatedEvent
+                - InferenceDeltaEvent
+                - InferenceTerminalEvent
+                - InferenceErrorEvent
+        default:
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    AccessRequestID:
+      in: path
+      name: id
+      required: true
+      schema:
+        allOf:
+          - $ref: '#/components/schemas/ResourceID'
+        pattern: '^ar_[a-z2-7]{26}$'
+    CapabilityID:
+      in: path
+      name: id
+      required: true
+      schema:
+        allOf:
+          - $ref: '#/components/schemas/ResourceID'
+        pattern: '^cap_[a-z2-7]{26}$'
+    Authorization:
+      in: header
+      name: Authorization
+      required: true
+      description: Send the issued opaque credential as `Innerva <token>`.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    ContentDigest:
+      in: header
+      name: Content-Digest
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    InnervaNonce:
+      in: header
+      name: Innerva-Nonce
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{16,128}$'
+    SignatureInput:
+      in: header
+      name: Signature-Input
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 2048
+    Signature:
+      in: header
+      name: Signature
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 2048
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      description: Scopes an exact create-response replay to this proof key, route, and signed body.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    IdempotencyKeyRequired:
+      in: header
+      name: Idempotency-Key
+      required: true
+      description: Required so a credential-consuming operation can safely return the same success response after response loss.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    Problem:
+      description: Request rejected.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    ResourceID:
+      type: string
+      minLength: 29
+      maxLength: 43
+      pattern: '^[a-z][a-z0-9]{1,15}_[a-z2-7]{26}$'
+    ProtocolVersion:
+      type: string
+      enum: ['0.1']
+    InferenceRequest:
+      type: object
+      additionalProperties: false
+      required: [model, input, max_output_tokens, stream]
+      properties:
+        model:
+          type: string
+          enum: ['innerva:standard']
+          x-enum-varnames: [InferenceRequestModelInnervaStandard]
+        input:
+          type: string
+          minLength: 1
+          maxLength: 32768
+        max_output_tokens:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 4096
+        stream:
+          type: boolean
+          enum: [true]
+    PublicJWK:
+      type: object
+      additionalProperties: false
+      required: [kty, crv, x, y]
+      properties:
+        kty:
+          type: string
+          enum: [EC]
+        crv:
+          type: string
+          enum: [P-256]
+        x:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+        y:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+    AccessRequest:
+      type: object
+      additionalProperties: false
+      required: [protocol_version, client, access_token, interact]
+      properties:
+        protocol_version:
+          $ref: '#/components/schemas/ProtocolVersion'
+        client:
+          $ref: '#/components/schemas/RequestClient'
+        access_token:
+          $ref: '#/components/schemas/RequestedAccessToken'
+        interact:
+          $ref: '#/components/schemas/RequestedInteraction'
+        client_reference:
+          type: string
+          minLength: 1
+          maxLength: 256
+    RequestClient:
+      type: object
+      additionalProperties: false
+      required: [key, display]
+      properties:
+        key:
+          type: object
+          additionalProperties: false
+          required: [proof, jwk]
+          properties:
+            proof:
+              type: string
+              enum: [httpsig]
+            jwk:
+              $ref: '#/components/schemas/PublicJWK'
+        display:
+          type: object
+          additionalProperties: false
+          required: [name, uri]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+            uri:
+              type: string
+              format: uri
+              maxLength: 2048
+    RequestedAccessToken:
+      type: object
+      additionalProperties: false
+      required: [access]
+      properties:
+        access:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: '#/components/schemas/RequestedAccess'
+    RequestedAccess:
+      type: object
+      additionalProperties: false
+      required: [type, actions, models, credits, duration]
+      properties:
+        type:
+          type: string
+          enum: [innerva_inference]
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+            enum: [responses.create]
+        models:
+          type: array
+          minItems: 1
+          maxItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: ['innerva:standard']
+            x-enum-varnames: [RequestedAccessModelsInnervaStandard]
+        credits:
+          $ref: '#/components/schemas/RequestedCredits'
+        duration:
+          type: string
+          enum: [until_depleted_or_revoked]
+    RequestedCredits:
+      type: object
+      additionalProperties: false
+      required: [unit]
+      properties:
+        suggested:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+        minimum:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+        unit:
+          type: string
+          enum: [innerva_credit]
+          x-enum-varnames: [RequestedCreditsUnitInnervaCredit]
+    RequestedInteraction:
+      type: object
+      additionalProperties: false
+      required: [start, finish]
+      properties:
+        start:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+            enum: [redirect]
+        finish:
+          type: object
+          additionalProperties: false
+          required: [method, uri, nonce, hash_method]
+          properties:
+            method:
+              type: string
+              enum: [redirect]
+            uri:
+              type: string
+              format: uri
+              maxLength: 2048
+            nonce:
+              type: string
+              pattern: '^[A-Za-z0-9_-]{16,128}$'
+            hash_method:
+              type: string
+              enum: [sha-256]
+    AccessRequestCreated:
+      type: object
+      additionalProperties: false
+      required: [protocol_version, request_id, instance_id, continue, interact, expires_in]
+      properties:
+        protocol_version:
+          $ref: '#/components/schemas/ProtocolVersion'
+        request_id:
+          $ref: '#/components/schemas/ResourceID'
+        instance_id:
+          $ref: '#/components/schemas/ResourceID'
+        continue:
+          $ref: '#/components/schemas/Continuation'
+        interact:
+          type: object
+          additionalProperties: false
+          required: [redirect, finish]
+          properties:
+            redirect:
+              type: string
+              format: uri
+            finish:
+              type: string
+        expires_in:
+          type: integer
+          minimum: 1
+    Continuation:
+      type: object
+      additionalProperties: false
+      required: [uri, access_token, wait]
+      properties:
+        uri:
+          type: string
+          format: uri
+        access_token:
+          $ref: '#/components/schemas/OpaqueAccessToken'
+        wait:
+          type: integer
+          minimum: 0
+    OpaqueAccessToken:
+      type: object
+      additionalProperties: false
+      required: [value]
+      properties:
+        value:
+          type: string
+          minLength: 32
+          maxLength: 128
+    ContinuationRequest:
+      type: object
+      additionalProperties: false
+      required: [interact_ref]
+      properties:
+        interact_ref:
+          type: string
+          minLength: 16
+          maxLength: 128
+    CapabilityResponse:
+      type: object
+      additionalProperties: false
+      required: [access_token]
+      properties:
+        access_token:
+          $ref: '#/components/schemas/InferenceAccessToken'
+    InferenceAccessToken:
+      type: object
+      additionalProperties: false
+      required: [value, access, expires_in, key, manage]
+      properties:
+        value:
+          type: string
+          minLength: 32
+          maxLength: 128
+        access:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: '#/components/schemas/GrantedAccess'
+        expires_in:
+          type: integer
+          minimum: 1
+        key:
+          type: object
+          additionalProperties: false
+          required: [jkt]
+          properties:
+            jkt:
+              type: string
+        manage:
+          type: object
+          additionalProperties: false
+          required: [uri, access_token]
+          properties:
+            uri:
+              type: string
+              format: uri
+            access_token:
+              $ref: '#/components/schemas/OpaqueAccessToken'
+    GrantedAccess:
+      type: object
+      additionalProperties: false
+      required: [type, actions, models, credits, grant_id]
+      properties:
+        type:
+          type: string
+          enum: [innerva_inference]
+        actions:
+          type: array
+          items:
+            type: string
+            enum: [responses.create]
+        models:
+          type: array
+          items:
+            type: string
+            enum: ['innerva:standard']
+            x-enum-varnames: [GrantedAccessModelsInnervaStandard]
+        credits:
+          type: object
+          additionalProperties: false
+          required: [grant_limit, grant_remaining, unit]
+          properties:
+            grant_limit:
+              type: integer
+              format: int64
+            grant_remaining:
+              type: integer
+              format: int64
+            unit:
+              type: string
+              enum: [innerva_credit]
+        grant_id:
+          $ref: '#/components/schemas/ResourceID'
+    InferenceCreatedEvent:
+      type: object
+      additionalProperties: false
+      required: [type, response]
+      properties:
+        type:
+          type: string
+          enum: [response.created]
+        response:
+          $ref: '#/components/schemas/InferenceCreatedResponse'
+    InferenceCreatedResponse:
+      type: object
+      additionalProperties: false
+      required: [id, model, status]
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceID'
+        model:
+          type: string
+          enum: ['innerva:standard']
+        status:
+          type: string
+          enum: [in_progress]
+    InferenceDeltaEvent:
+      type: object
+      additionalProperties: false
+      required: [type, response_id, delta]
+      properties:
+        type:
+          type: string
+          enum: [response.output_text.delta]
+        response_id:
+          $ref: '#/components/schemas/ResourceID'
+        delta:
+          type: string
+          description: The next normalized text fragment. Innerva does not persist it.
+    InferenceTerminalEvent:
+      type: object
+      additionalProperties: false
+      required: [type, response]
+      properties:
+        type:
+          type: string
+          enum: [response.completed, response.incomplete]
+        response:
+          $ref: '#/components/schemas/InferenceTerminalResponse'
+    InferenceTerminalResponse:
+      type: object
+      additionalProperties: false
+      required: [id, model, status, usage, credits]
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceID'
+        model:
+          type: string
+          enum: ['innerva:standard']
+        status:
+          type: string
+          enum: [completed, incomplete]
+          description: >-
+            completed means output text was delivered and settled at measured
+            usage. incomplete covers both a provider-declared incomplete
+            response and a response that terminated without delivering any
+            output text (for example a reasoning model consuming the entire
+            output budget on reasoning tokens); in the no-output case the
+            reservation is released and credits.charged is 0, so retrying an
+            incomplete response with charged 0 repeats work that may again
+            produce no output.
+        usage:
+          $ref: '#/components/schemas/InferenceUsage'
+        credits:
+          $ref: '#/components/schemas/InferenceCredits'
+    InferenceUsage:
+      type: object
+      additionalProperties: false
+      required: [input_units, output_units]
+      properties:
+        input_units:
+          type: integer
+          format: int64
+          minimum: 0
+        output_units:
+          type: integer
+          format: int64
+          minimum: 0
+    InferenceCredits:
+      type: object
+      additionalProperties: false
+      required: [charged, unit, capped]
+      properties:
+        charged:
+          type: integer
+          format: int64
+          minimum: 0
+        unit:
+          type: string
+          enum: [innerva_credit]
+        capped:
+          type: boolean
+    InferenceErrorEvent:
+      type: object
+      additionalProperties: false
+      required: [type, error]
+      properties:
+        type:
+          type: string
+          enum: [error]
+        error:
+          $ref: '#/components/schemas/InferenceStreamError'
+    InferenceStreamError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - incomplete_provider_stream
+            - provider_stream_failed
+            - invalid_provider_stream
+            - accounting_failed
+        message:
+          type: string
+    EmptyRequest:
+      type: object
+      additionalProperties: false
+    Problem:
+      type: object
+      additionalProperties: false
+      description: >-
+        An RFC 9457 problem details object returned for every rejected
+        request. Branch on `code` rather than `title` or `detail`; the
+        `x-problem-codes` extension lists the codes the public API returns.
+      x-problem-codes:
+        - code: empty_output_brake
+          status: 429
+          description: >-
+            The grant recently produced too many uncharged empty responses
+            (ADR 0003). New requests are refused until older empty responses
+            leave the rolling window; no operator action is needed.
+        - code: idempotency_mismatch
+          status: 409
+          description: The `Idempotency-Key` was already used with a different request.
+        - code: inference_already_started
+          status: 409
+          description: >-
+            An inference operation already exists for this `Idempotency-Key`.
+            Streamed content is never retained, so it cannot be replayed.
+        - code: insufficient_credits
+          status: 402
+          description: The grant does not have enough available credits for this request.
+        - code: internal_error
+          status: 500
+          description: The request could not be completed.
+        - code: invalid_content_digest
+          status: 400
+          description: '`Content-Digest` is missing or does not match the request body.'
+        - code: invalid_content_type
+          status: 400
+          description: '`Content-Type` must be `application/json`.'
+        - code: invalid_credential
+          status: 401
+          description: The `Authorization` credential is missing, malformed, or not valid for this operation.
+        - code: invalid_proof
+          status: 401
+          description: The HTTP message signature could not be verified.
+        - code: invalid_proof_key
+          status: 400
+          description: A public P-256 proof key is required.
+        - code: invalid_request
+          status: 400
+          description: The headers, path, or body do not match this contract or violate a policy bound.
+        - code: invalid_spend_authorization
+          status: 401
+          description: A staging spend authorization is missing, expired, or not issued for this proof key.
+        - code: invalid_state
+          status: 409
+          description: The operation is not valid in the resource's current state.
+        - code: overloaded
+          status: 503
+          description: The service is temporarily overloaded; retry later.
+        - code: provider_unavailable
+          status: 502
+          description: The inference provider could not start the request.
+        - code: replayed_request
+          status: 401
+          description: The signed request nonce has already been used.
+        - code: request_expired
+          status: 410
+          description: The access request is no longer active.
+        - code: sandbox_unavailable
+          status: 503
+          description: Access fulfillment is not configured in this environment.
+        - code: streaming_unavailable
+          status: 500
+          description: The HTTP server cannot stream this response.
+        - code: unsupported_protocol_version
+          status: 400
+          description: This server supports protocol version 0.1.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+    Discovery:
+      type: object
+      additionalProperties: false
+      required:
+        - issuer
+        - access_request_endpoint
+        - inference_endpoint
+        - sdk_index
+        - openapi_document
+        - proof_methods_supported
+        - jwk_algorithms_supported
+        - interaction_start_modes_supported
+        - protocol_versions_supported
+        - protocol_version
+      properties:
+        issuer:
+          type: string
+          format: uri
+        access_request_endpoint:
+          type: string
+          format: uri
+        inference_endpoint:
+          type: string
+          format: uri
+        sdk_index:
+          type: string
+          format: uri
+          description: >-
+            Human-readable index of client SDK downloads. The tarballs beneath
+            it are embedded in the server binary at build time, so a download
+            always matches the deployed protocol version.
+        openapi_document:
+          type: string
+          format: uri
+          description: >-
+            The OpenAPI document this deployment was generated from, served
+            verbatim as application/yaml with a Content-Digest header.
+        proof_methods_supported:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+            enum: [httpsig]
+        jwk_algorithms_supported:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+            enum: [ES256]
+        interaction_start_modes_supported:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+            enum: [redirect]
+        protocol_versions_supported:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: '#/components/schemas/ProtocolVersion'
+        protocol_version:
+          $ref: '#/components/schemas/ProtocolVersion'

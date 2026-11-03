@@ -1,0 +1,152 @@
+{
+  "description": "Inference stream transcripts and the typed outcome each client must map them to. Streamed content is never retained server-side, so none of these outcomes may trigger an automatic retry.",
+  "cases": [
+    {
+      "name": "completed-two-deltas",
+      "description": "Normal completion: created, two text deltas, completed terminal.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"Hello, \"}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"world.\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"completed\",\"usage\":{\"input_units\":12,\"output_units\":4},\"credits\":{\"charged\":3,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "completed",
+        "operation_id": "resp_conformance4567abcdefghij",
+        "output": "Hello, world.",
+        "input_units": 12,
+        "output_units": 4,
+        "credits_charged": 3
+      }
+    },
+    {
+      "name": "completed-with-comment-lines",
+      "description": "SSE comment lines inside an event block and multibyte output must be tolerated.",
+      "sse": ": stream comment\nevent: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\n: mid-block comment\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"héllo ✓\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"completed\",\"usage\":{\"input_units\":5,\"output_units\":2},\"credits\":{\"charged\":1,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "completed",
+        "operation_id": "resp_conformance4567abcdefghij",
+        "output": "héllo ✓",
+        "input_units": 5,
+        "output_units": 2,
+        "credits_charged": 1
+      }
+    },
+    {
+      "name": "incomplete-capped-partial-output",
+      "description": "Budget-capped response: partial output, incomplete terminal, capped charge.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"Partial answer that ran ou\"}\n\nevent: response.incomplete\ndata: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"incomplete\",\"usage\":{\"input_units\":40,\"output_units\":64},\"credits\":{\"charged\":25,\"unit\":\"innerva_credit\",\"capped\":true}}}\n\n",
+      "expect": {
+        "kind": "incomplete",
+        "operation_id": "resp_conformance4567abcdefghij",
+        "output": "Partial answer that ran ou",
+        "input_units": 40,
+        "output_units": 64,
+        "credits_charged": 25,
+        "credits_capped": true
+      }
+    },
+    {
+      "name": "incomplete-empty-output-uncharged",
+      "description": "Uncharged no-output case: the provider completed upstream but delivered no output text, so the reservation is released and credits.charged is 0. Clients must surface this as a distinct, branchable incomplete outcome, not an error.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.incomplete\ndata: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"incomplete\",\"usage\":{\"input_units\":30,\"output_units\":512},\"credits\":{\"charged\":0,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "incomplete",
+        "operation_id": "resp_conformance4567abcdefghij",
+        "input_units": 30,
+        "output_units": 512
+      }
+    },
+    {
+      "name": "error-event-after-output",
+      "description": "A typed error event after deltas: surface code, operation id, and partial output; never auto-retry.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"The first half of an ans\"}\n\nevent: error\ndata: {\"type\":\"error\",\"error\":{\"code\":\"provider_stream_failed\",\"message\":\"The provider stream failed mid-response.\"}}\n\n",
+      "expect": {
+        "kind": "stream_error",
+        "operation_id": "resp_conformance4567abcdefghij",
+        "partial_output": "The first half of an ans",
+        "error_code": "provider_stream_failed",
+        "error_message": "The provider stream failed mid-response."
+      }
+    },
+    {
+      "name": "error-event-before-created",
+      "description": "A typed error event before response.created carries no operation id.",
+      "sse": "event: error\ndata: {\"type\":\"error\",\"error\":{\"code\":\"accounting_failed\",\"message\":\"The response could not be settled.\"}}\n\n",
+      "expect": {
+        "kind": "stream_error",
+        "error_code": "accounting_failed",
+        "error_message": "The response could not be settled."
+      }
+    },
+    {
+      "name": "interrupted-after-deltas",
+      "description": "Stream ended without a terminal event: typed interruption with the operation id and partial output.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"An unfinished ans\"}\n\n",
+      "expect": {
+        "kind": "interrupted",
+        "operation_id": "resp_conformance4567abcdefghij",
+        "partial_output": "An unfinished ans"
+      }
+    },
+    {
+      "name": "interrupted-before-created",
+      "description": "Stream ended before response.created: typed interruption with no operation id.",
+      "sse": "",
+      "expect": {
+        "kind": "interrupted"
+      }
+    },
+    {
+      "name": "invalid-comment-only-block",
+      "description": "A blank line terminating a block with no event or data is a protocol violation in the strict v0.1 profile.",
+      "sse": ": keep-alive\n\nevent: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"completed\",\"usage\":{\"input_units\":1,\"output_units\":1},\"credits\":{\"charged\":1,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    },
+    {
+      "name": "invalid-duplicate-created",
+      "description": "A second response.created event is a protocol violation.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"completed\",\"usage\":{\"input_units\":1,\"output_units\":1},\"credits\":{\"charged\":1,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    },
+    {
+      "name": "invalid-delta-before-created",
+      "description": "A delta before response.created is a protocol violation.",
+      "sse": "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghij\",\"delta\":\"early\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"completed\",\"usage\":{\"input_units\":1,\"output_units\":1},\"credits\":{\"charged\":1,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    },
+    {
+      "name": "invalid-delta-operation-mismatch",
+      "description": "A delta whose response_id does not match response.created is a protocol violation.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"response_id\":\"resp_conformance4567abcdefghik\",\"delta\":\"x\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"completed\",\"usage\":{\"input_units\":1,\"output_units\":1},\"credits\":{\"charged\":1,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    },
+    {
+      "name": "invalid-terminal-status-mismatch",
+      "description": "A response.completed event whose status field says incomplete is a protocol violation.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"incomplete\",\"usage\":{\"input_units\":1,\"output_units\":1},\"credits\":{\"charged\":1,\"unit\":\"innerva_credit\",\"capped\":false}}}\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    },
+    {
+      "name": "invalid-unknown-event-name",
+      "description": "An unknown event name is a protocol violation.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.reasoning.delta\ndata: {\"type\":\"response.reasoning.delta\"}\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    },
+    {
+      "name": "invalid-non-json-data",
+      "description": "A data field that is not strict JSON for the named event is a protocol violation.",
+      "sse": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_conformance4567abcdefghij\",\"model\":\"innerva:standard\",\"status\":\"in_progress\"}}\n\nevent: response.output_text.delta\ndata: not json\n\n",
+      "expect": {
+        "kind": "invalid"
+      }
+    }
+  ]
+}

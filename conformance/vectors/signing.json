@@ -1,0 +1,138 @@
+{
+  "description": "ES256 HTTP message-signature conformance cases. A client must reproduce content_digest, signature_input, and signature_base exactly, verify the recorded signature over signature_base with the public key, and produce its own signature that verifies over the same base.",
+  "algorithm": "ecdsa-p256-sha256",
+  "signature_label": "sig1",
+  "key": {
+    "jwk": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "YbuGOya-fyL0mZyV_3CAp_fQaGAY54gRMO41GBvkM3I",
+      "y": "TOE8DoY3DL1yWg_8bb93xsDdjd-ZPHa7xXco2UkY7oQ",
+      "d": "TCyAF0y2TYTqwTRX9fvpZrKPO9TfXCewW4J1ihrwfEI"
+    },
+    "thumbprint": "n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4"
+  },
+  "cases": [
+    {
+      "name": "create-access-request",
+      "description": "Initial signed access request: body, idempotency key, no access token.",
+      "request": {
+        "method": "POST",
+        "target_uri": "https://api.innerva.example/v1/access-requests",
+        "content_type": "application/json",
+        "body": "{\"protocol_version\":\"0.1\",\"client\":{\"key\":{\"proof\":\"httpsig\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"YbuGOya-fyL0mZyV_3CAp_fQaGAY54gRMO41GBvkM3I\",\"y\":\"TOE8DoY3DL1yWg_8bb93xsDdjd-ZPHa7xXco2UkY7oQ\"}},\"display\":{\"name\":\"Conformance Suite\",\"uri\":\"https://client.example\"}},\"access_token\":{\"access\":[{\"type\":\"innerva_inference\",\"actions\":[\"responses.create\"],\"models\":[\"innerva:standard\"],\"credits\":{\"suggested\":1000,\"unit\":\"innerva_credit\"},\"duration\":\"until_depleted_or_revoked\"}]},\"interact\":{\"start\":[\"redirect\"],\"finish\":{\"method\":\"redirect\",\"uri\":\"https://client.example/callback\",\"nonce\":\"cf1_conformance_finish_nonce\",\"hash_method\":\"sha-256\"}}}",
+        "idempotency_key": "ik_conformance_create_access"
+      },
+      "nonce": "n1_conformance_nonce_create_access",
+      "created": 1783814400,
+      "expires": 1783814460,
+      "expected": {
+        "content_digest": "sha-256=:ClCBCK7U9N+gSjd54niXprerBjL2bcmQLEbQUwnImsw=:",
+        "signature_input": "sig1=(\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"idempotency-key\");created=1783814400;expires=1783814460;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature_base": "\"@method\": POST\n\"@target-uri\": https://api.innerva.example/v1/access-requests\n\"content-digest\": sha-256=:ClCBCK7U9N+gSjd54niXprerBjL2bcmQLEbQUwnImsw=:\n\"content-type\": application/json\n\"innerva-nonce\": n1_conformance_nonce_create_access\n\"idempotency-key\": ik_conformance_create_access\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"idempotency-key\");created=1783814400;expires=1783814460;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature": "MMS6BYcx5RKy2A8soU4ToN7Xd8AP77SwtGTJY+pVzuWuZeMx4eE9h1UwB1sWWVdbskM6Ib459HM+f1PhDYdOxA=="
+      }
+    },
+    {
+      "name": "continue-access-request",
+      "description": "Continuation request: body, continuation token, idempotency key.",
+      "request": {
+        "method": "POST",
+        "target_uri": "https://api.innerva.example/v1/access-requests/ar_conformance234567abcdefghij/continue",
+        "content_type": "application/json",
+        "body": "{\"interact_ref\":\"ref_conformance_interact\"}",
+        "authorization": "Innerva ct1_conformance_continuation_token_value",
+        "idempotency_key": "continue-conformance"
+      },
+      "nonce": "n1_conformance_nonce_continue_req",
+      "created": 1783814401,
+      "expires": 1783814461,
+      "expected": {
+        "content_digest": "sha-256=:9CgmATEPOg9+i9N/jpA0rKCKlcnecRrAfBnq71LAhaA=:",
+        "signature_input": "sig1=(\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814401;expires=1783814461;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature_base": "\"@method\": POST\n\"@target-uri\": https://api.innerva.example/v1/access-requests/ar_conformance234567abcdefghij/continue\n\"content-digest\": sha-256=:9CgmATEPOg9+i9N/jpA0rKCKlcnecRrAfBnq71LAhaA=:\n\"content-type\": application/json\n\"innerva-nonce\": n1_conformance_nonce_continue_req\n\"authorization\": Innerva ct1_conformance_continuation_token_value\n\"idempotency-key\": continue-conformance\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814401;expires=1783814461;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature": "ffH74/YjchyrPmYkQbbSTZfcP26JhDnvRVX6jo4x/PBEFQRQXmhcSX6wGWpZHitm29lVbtmEX6ffWhbwAsuGLw=="
+      }
+    },
+    {
+      "name": "create-inference-response",
+      "description": "Streaming inference request: body, inference token, idempotency key.",
+      "request": {
+        "method": "POST",
+        "target_uri": "https://api.innerva.example/v1/responses",
+        "content_type": "application/json",
+        "body": "{\"model\":\"innerva:standard\",\"input\":\"Say the word ready and nothing else.\",\"max_output_tokens\":64,\"stream\":true}",
+        "authorization": "Innerva it1_conformance_inference_token_value",
+        "idempotency_key": "op_conformance_inference_1"
+      },
+      "nonce": "n1_conformance_nonce_inference_1",
+      "created": 1783814402,
+      "expires": 1783814462,
+      "expected": {
+        "content_digest": "sha-256=:JXOus7tnxl73YqEGloBgc6Jrc+/kexMqkikWwV1HgMY=:",
+        "signature_input": "sig1=(\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814402;expires=1783814462;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature_base": "\"@method\": POST\n\"@target-uri\": https://api.innerva.example/v1/responses\n\"content-digest\": sha-256=:JXOus7tnxl73YqEGloBgc6Jrc+/kexMqkikWwV1HgMY=:\n\"content-type\": application/json\n\"innerva-nonce\": n1_conformance_nonce_inference_1\n\"authorization\": Innerva it1_conformance_inference_token_value\n\"idempotency-key\": op_conformance_inference_1\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814402;expires=1783814462;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature": "H8obn+wqomPDZxmYAXDXTRRNL4GZGKCDCa3DkSHp6euR8MryFY3U8/CzP3r7UoqjJEyn+TXQxLRwbPhEzBG79w=="
+      }
+    },
+    {
+      "name": "rotate-capability",
+      "description": "Rotation request with the empty JSON object body.",
+      "request": {
+        "method": "POST",
+        "target_uri": "https://api.innerva.example/v1/capabilities/cap_conformance34567abcdefghijk/rotate",
+        "content_type": "application/json",
+        "body": "{}",
+        "authorization": "Innerva mt1_conformance_management_token_value",
+        "idempotency_key": "rotate-conformance"
+      },
+      "nonce": "n1_conformance_nonce_rotate_cap1",
+      "created": 1783814403,
+      "expires": 1783814463,
+      "expected": {
+        "content_digest": "sha-256=:RBNvo1WzZ4oRRq0W9+hknpT7T8If536DEMBg9hyq/4o=:",
+        "signature_input": "sig1=(\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814403;expires=1783814463;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature_base": "\"@method\": POST\n\"@target-uri\": https://api.innerva.example/v1/capabilities/cap_conformance34567abcdefghijk/rotate\n\"content-digest\": sha-256=:RBNvo1WzZ4oRRq0W9+hknpT7T8If536DEMBg9hyq/4o=:\n\"content-type\": application/json\n\"innerva-nonce\": n1_conformance_nonce_rotate_cap1\n\"authorization\": Innerva mt1_conformance_management_token_value\n\"idempotency-key\": rotate-conformance\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814403;expires=1783814463;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature": "F8lMtkpgNNreOJzStSjSWKq23iWrzHC65pJqOSR55gq2CaaIZ+h9iH4nR1ti/WQYWp62W0tcf+4Bf21csvVa1Q=="
+      }
+    },
+    {
+      "name": "revoke-capability",
+      "description": "Bodyless DELETE: no content-digest, content-type, or idempotency key.",
+      "request": {
+        "method": "DELETE",
+        "target_uri": "https://api.innerva.example/v1/capabilities/cap_conformance34567abcdefghijk",
+        "authorization": "Innerva mt1_conformance_management_token_value"
+      },
+      "nonce": "n1_conformance_nonce_revoke_cap1",
+      "created": 1783814404,
+      "expires": 1783814464,
+      "expected": {
+        "signature_input": "sig1=(\"@method\" \"@target-uri\" \"innerva-nonce\" \"authorization\");created=1783814404;expires=1783814464;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature_base": "\"@method\": DELETE\n\"@target-uri\": https://api.innerva.example/v1/capabilities/cap_conformance34567abcdefghijk\n\"innerva-nonce\": n1_conformance_nonce_revoke_cap1\n\"authorization\": Innerva mt1_conformance_management_token_value\n\"@signature-params\": (\"@method\" \"@target-uri\" \"innerva-nonce\" \"authorization\");created=1783814404;expires=1783814464;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature": "O1cU+6Il+dfekbBZwxAUNhdr/FYeDDFE8f6s26f0oFT0+VGBrpdZOYXQCkje0cMZgGvftikVGL7aezn4pMG/aQ=="
+      }
+    },
+    {
+      "name": "non-default-port-and-unicode-body",
+      "description": "Loopback development origin with an explicit port and a multibyte UTF-8 body.",
+      "request": {
+        "method": "POST",
+        "target_uri": "http://localhost:8443/v1/responses",
+        "content_type": "application/json",
+        "body": "{\"model\":\"innerva:standard\",\"input\":\"こんにちは — résumé ✓\",\"max_output_tokens\":16,\"stream\":true}",
+        "authorization": "Innerva it1_conformance_inference_token_value",
+        "idempotency_key": "op_conformance_inference_2"
+      },
+      "nonce": "n1_conformance_nonce_inference_2",
+      "created": 1783814405,
+      "expires": 1783814465,
+      "expected": {
+        "content_digest": "sha-256=:TWip2tFPJ/srdRXen2TimWAhh+gJKe9BwOAUfD7PqVU=:",
+        "signature_input": "sig1=(\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814405;expires=1783814465;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature_base": "\"@method\": POST\n\"@target-uri\": http://localhost:8443/v1/responses\n\"content-digest\": sha-256=:TWip2tFPJ/srdRXen2TimWAhh+gJKe9BwOAUfD7PqVU=:\n\"content-type\": application/json\n\"innerva-nonce\": n1_conformance_nonce_inference_2\n\"authorization\": Innerva it1_conformance_inference_token_value\n\"idempotency-key\": op_conformance_inference_2\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"content-type\" \"innerva-nonce\" \"authorization\" \"idempotency-key\");created=1783814405;expires=1783814465;keyid=\"n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4\";alg=\"ecdsa-p256-sha256\"",
+        "signature": "/ECsJOOvQwQ0ZMtZkS9DZIyPFmGajht4gRRJa/z4Imc/YrqRrekmqaNdhRUtdAK7YBbvXwfeZH8H/JwQNLpVCg=="
+      }
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "description": "Deterministic hashing cases: RFC 7638 JWK thumbprints, canonical Content-Digest values, and interaction callback hashes.",
+  "thumbprint_cases": [
+    {
+      "name": "signing-key",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "YbuGOya-fyL0mZyV_3CAp_fQaGAY54gRMO41GBvkM3I",
+        "y": "TOE8DoY3DL1yWg_8bb93xsDdjd-ZPHa7xXco2UkY7oQ"
+      },
+      "thumbprint": "n6UuuzgJ81GlqLZOm6dWygLstksXMxlFR3MgEwEwDY4"
+    },
+    {
+      "name": "innerva-conformance-aux-key-1",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "_rOqZzoksiSr79qy-JeadYg2Pk6l5OZGzApRGVgPWCc",
+        "y": "_vh1wl2NJpr1MEQBkAFBLKhiEH6quyzoeKP5DAJTjCk"
+      },
+      "thumbprint": "i9Apa03AqldiG84KtpullQKwXTypPJTgBkItpxxyKBo"
+    },
+    {
+      "name": "innerva-conformance-aux-key-2",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "dBdsLhhzMsZsFnGPfIi2W02Pyj3wOAiy40KbOAkadX4",
+        "y": "pC_wXbE-C7JmcjEwp8iwRLTL-j-3bkAulVU7A3quIk4"
+      },
+      "thumbprint": "0-kYma9qQVcJ9QzR4yMH5WIyJ6MTkqdHSPgHVeNDjt4"
+    }
+  ],
+  "content_digest_cases": [
+    {
+      "name": "empty-object",
+      "body_base64": "e30=",
+      "content_digest": "sha-256=:RBNvo1WzZ4oRRq0W9+hknpT7T8If536DEMBg9hyq/4o=:"
+    },
+    {
+      "name": "typical-json",
+      "body_base64": "eyJtb2RlbCI6ImlubmVydmE6c3RhbmRhcmQiLCJpbnB1dCI6ImhlbGxvIiwibWF4X291dHB1dF90b2tlbnMiOjMyLCJzdHJlYW0iOnRydWV9",
+      "content_digest": "sha-256=:g/aLGTaFcNQYHyZFhhK3kvdTmipNuOm8djAgurereog=:"
+    },
+    {
+      "name": "multibyte-utf8",
+      "body_base64": "eyJpbnB1dCI6IuOBk+OCk+OBq+OBoeOBryDigJQg4pyTIn0=",
+      "content_digest": "sha-256=:3Vf+yXDElqpTRn5WijbzLOIkskN5UDuGUHxwq8mY+CI=:"
+    },
+    {
+      "name": "binary-bytes",
+      "body_base64": "AAH+/3+A",
+      "content_digest": "sha-256=:NKxxR6alhhfQ1caZ31V0WXNZUqb/Pg1CVWhN+asBRbg=:"
+    }
+  ],
+  "callback_hash_cases": [
+    {
+      "name": "production-origin",
+      "client_finish": "cf1_conformance_client_finish_1",
+      "server_finish": "sf1_conformance_server_finish_1",
+      "interact_ref": "ref_conformance_interact_1",
+      "access_endpoint": "https://api.innerva.example/v1/access-requests",
+      "hash": "eaPplNujzlASxlK90wk1Q0aHzND8mtpKnqG_HM8o7To"
+    },
+    {
+      "name": "loopback-origin",
+      "client_finish": "cf1_conformance_client_finish_2",
+      "server_finish": "sf1_conformance_server_finish_2",
+      "interact_ref": "ref_conformance_interact_2",
+      "access_endpoint": "http://localhost:8443/v1/access-requests",
+      "hash": "7A7dLqzck3z0Nz1g8pP9gZJyvuXIe9I6ZpcVlvr_JeU"
+    }
+  ]
+}
